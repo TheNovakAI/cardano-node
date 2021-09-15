@@ -1,9 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Cardano.Tracer.Handlers.Logs.Log
-  ( logPrefix
-  , logExtension
-  , createLogAndSymLink
+  ( createLogAndSymLink
   , createLogAndUpdateSymLink
   , doesSymLinkValid
   , getTimeStampFromLog
@@ -56,12 +54,14 @@ doesSymLinkValid pathToSymLink = do
 
 isItLog :: LogFormat -> FilePath -> Bool
 isItLog format pathToLog = hasProperPrefix && hasTimestamp && hasProperExt
-  where
+ where
   fileName        = takeFileName pathToLog
   hasProperPrefix = T.pack logPrefix `T.isPrefixOf` T.pack fileName
   hasTimestamp    = isJust timeStamp
+
   timeStamp :: Maybe UTCTime
-  timeStamp = parseTimeM True defaultTimeLocale timeStampFormat (T.unpack maybeTimestamp)
+  timeStamp = parseTimeM True defaultTimeLocale timeStampFormat $ T.unpack maybeTimestamp
+
   maybeTimestamp  = T.drop (length logPrefix) . T.pack . takeBaseName $ fileName
   hasProperExt    = takeExtension fileName == logExtension format
 
@@ -77,7 +77,8 @@ createLogAndUpdateSymLink subDirForLogs format = withCurrentDirectory subDirForL
   newLog <- createLog format
   let tmpSymLink  = symLinkNameTmp format
       realSymLink = symLinkName format
-  whenM (doesFileExist tmpSymLink) $ removeFile tmpSymLink
+  whenM (doesFileExist tmpSymLink) $
+    removeFile tmpSymLink
   createFileLink newLog tmpSymLink
   renamePath tmpSymLink realSymLink -- Atomic operation, uses POSIX.rename.
 
@@ -85,7 +86,7 @@ createLog :: LogFormat -> IO FilePath
 createLog format = do
   ts <- formatTime defaultTimeLocale timeStampFormat <$> getCurrentTime
   let logName = logPrefix <> ts <.> logExtension format
-  LBS.writeFile logName LBS.empty
+  LBS.writeFile logName LBS.empty -- Create an empty file.
   return logName
 
 -- | This function is applied to the log we already checked,

@@ -14,6 +14,7 @@ module Cardano.Tracer.Handlers.Logs.Journal
 import qualified Data.HashMap.Strict as HM
 import           Data.Maybe (fromMaybe)
 import qualified Data.Text as T
+import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.Time.Format (defaultTimeLocale, formatTime)
 import           Systemd.Journal (Priority (..), message, mkJournalField,
@@ -34,7 +35,7 @@ import           Cardano.Tracer.Types
 #if defined(LINUX)
 writeTraceObjectsToJournal
   :: NodeId
-  -> NodeName
+  -> Text
   -> [TraceObject]
   -> IO ()
 writeTraceObjectsToJournal _ _ [] = return ()
