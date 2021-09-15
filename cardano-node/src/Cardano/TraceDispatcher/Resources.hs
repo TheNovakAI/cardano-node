@@ -1,13 +1,13 @@
 module Cardano.TraceDispatcher.Resources
   (
     startResourceTracer
-  , docResourceStats
   , namesForResources
   , severityResources
   ) where
 
 
 import           Cardano.Logging
+import           Cardano.Logging.Resources
 import           Cardano.Prelude hiding (trace)
 
 startResourceTracer ::

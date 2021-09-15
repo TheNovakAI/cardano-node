@@ -24,7 +24,7 @@ import           Control.Monad.Trans.Except.Extra (left)
 import           "contra-tracer" Control.Tracer
 import           Data.Text (breakOn, pack, take)
 import qualified Data.Text as Text
-import           Data.Time.Clock (getCurrentTime)
+import           Data.Time.Clock (UTCTime, getCurrentTime)
 import           Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import           Data.Version (showVersion)
 import           Network.HostName (getHostName)
@@ -75,11 +75,14 @@ import           Ouroboros.Consensus.Node (DiffusionArguments (..),
 import qualified Ouroboros.Consensus.Node as Node (getChainDB, run)
 import           Ouroboros.Consensus.Node.ProtocolInfo
 import           Ouroboros.Consensus.Util.Orphans ()
+import           Ouroboros.Network.IOManager (withIOManager)
 import           Ouroboros.Network.NodeToNode (AcceptedConnectionsLimit (..),
                      DiffusionMode)
 
 import           Cardano.Api
 import qualified Cardano.Api.Protocol.Types as Protocol
+
+import           Trace.Forward.Protocol.Type (NodeInfo (..))
 
 import           Cardano.Node.Configuration.Socket (SocketOrSocketInfo (..),
                      gatherConfiguredSockets, getSocketOrSocketInfoAddr,
@@ -98,6 +101,7 @@ runNode
   :: PartialNodeConfiguration
   -> IO ()
 runNode cmdPc = do
+    now <- getCurrentTime
     -- TODO: Remove sodiumInit: https://github.com/input-output-hk/cardano-base/issues/175
     Crypto.sodiumInit
 
@@ -139,7 +143,8 @@ runNode cmdPc = do
         Just fileName -> NL.readConfiguration (unConfigPath fileName)
         Nothing -> putTextLn "No configuration file name found!" >> exitFailure
     baseTrace    <- NL.standardTracer Nothing
-    forwardTrace <- NL.forwardTracer loggerConfiguration undefined
+    nodeInfo     <- prepareNodeInfo now
+    forwardTrace <- withIOManager $ \iomgr -> NL.forwardTracer iomgr loggerConfiguration nodeInfo
     mbEkgTrace   <- case llEKGDirect loggingLayer of
                       Nothing -> pure Nothing
                       Just ekgDirect ->
@@ -516,3 +521,15 @@ producerAddresses nt =
       . mapMaybe remoteAddressToNodeAddress
       . concatMap producers
       $ nodeSetup
+
+-- TODO: temporary function. It will be replaced by the real collector of node's info.
+prepareNodeInfo :: UTCTime -> IO NodeInfo
+prepareNodeInfo now = return $
+  NodeInfo
+    { niName            = ""
+    , niProtocol        = ""
+    , niVersion         = ""
+    , niCommit          = ""
+    , niStartTime       = now
+    , niSystemStartTime = now
+    }

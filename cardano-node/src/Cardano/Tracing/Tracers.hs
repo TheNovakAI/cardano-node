@@ -972,11 +972,7 @@ forgeStateInfoTracer p _ts tracer = Tracer $ \ev -> do
 --------------------------------------------------------------------------------
 
 nodeToClientTracers'
-  :: ( StandardHash blk
-     , Show (ApplyTxErr blk)
-     , Show (GenTx blk)
-     , Show localPeer
-     , ShowQuery (BlockQuery blk)
+  :: ( ShowQuery (BlockQuery blk)
      , ToObject localPeer
      )
   => TraceSelection

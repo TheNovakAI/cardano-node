@@ -22,6 +22,8 @@ import           Network.Mux (MuxTrace (..), WithMuxBearer (..))
 import qualified Network.Socket as Socket
 
 import           Cardano.Logging
+import           Cardano.Logging.Resources
+import           Cardano.Logging.Resources.Types
 import           Cardano.Prelude hiding (trace)
 import           Cardano.TraceDispatcher.BasicInfo.Combinators
 import           Cardano.TraceDispatcher.BasicInfo.Types (BasicInfo)

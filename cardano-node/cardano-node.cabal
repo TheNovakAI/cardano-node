@@ -169,6 +169,8 @@ library
                       , time
                       , tracer-transformers
                       , trace-dispatcher
+                      , trace-forward
+                      , trace-resources
                       , transformers
                       , transformers-except
                       , unordered-containers
