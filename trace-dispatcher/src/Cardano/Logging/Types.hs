@@ -282,6 +282,8 @@ data TraceConfig = TraceConfig {
     tcOptions            :: Map.Map Namespace [ConfigOption]
   , tcForwarder          :: RemoteAddr
   , tcForwarderQueueSize :: Int
+    -- | Opional human-readable name of the node.
+  , tcNodeName           :: Maybe Text
 }
   deriving (Eq, Ord, Show)
 
@@ -290,6 +292,7 @@ emptyTraceConfig = TraceConfig {
     tcOptions = Map.empty
   , tcForwarder = LocalSocket "forwarder.log"
   , tcForwarderQueueSize = 1500
+  , tcNodeName = Nothing
   }
 
 ---------------------------------------------------------------------------
