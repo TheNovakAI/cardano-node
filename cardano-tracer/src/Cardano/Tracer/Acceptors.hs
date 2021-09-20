@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE PackageImports #-}
@@ -79,7 +78,7 @@ runAcceptorsWithBrakes
 runAcceptorsWithBrakes config@TracerConfig{acceptAt} acceptedMetrics acceptedNodeInfo protocolsBrakes =
   forConcurrently_ (zip acceptAt protocolsBrakes) $ \(LocalSocket p, (stopEKG, stopTF)) ->
     runAcceptorsForOneNode config acceptedMetrics acceptedNodeInfo p stopEKG stopTF
-    
+
 runAcceptorsForOneNode
   :: TracerConfig
   -> AcceptedMetrics
