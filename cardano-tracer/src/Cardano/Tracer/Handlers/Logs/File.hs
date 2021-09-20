@@ -1,11 +1,10 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module Cardano.Tracer.Handlers.Logs.File
-  ( writeTraceObjectsToFile
+  ( writeNodeInfoToFile
+  , writeTraceObjectsToFile
   ) where
 
 import           Control.Monad (unless)
@@ -26,6 +25,8 @@ import           System.FilePath ((</>))
 
 import           Cardano.Logging
 
+import           Trace.Forward.Protocol.Type (NodeInfo (..))
+
 import           Cardano.Tracer.Configuration
 import           Cardano.Tracer.Handlers.Logs.Log (createLogAndSymLink, doesSymLinkValid,
                                                    symLinkName)
@@ -41,8 +42,24 @@ import           Cardano.Tracer.Types
 --       ...
 --       node.json -> node-*-3.json
 --
--- So 'TraceObject's received from the node will be stored in the logs
+-- So 'TraceObject's and 'NodeInfo' received from the node will be stored in the logs
 -- saved in the corresponding subdirectory inside of 'rootDir'.
+
+writeNodeInfoToFile
+  :: NodeId
+  -> FilePath
+  -> LogFormat
+  -> NodeInfo
+  -> IO ()
+writeNodeInfoToFile nodeId rootDir format nodeInfo = do
+  pathToCurrentLog <- prepareLogsStructure nodeId (niName nodeInfo) rootDir format 
+  LBS.appendFile pathToCurrentLog . encodeUtf8 $ preparedNodeInfo
+ where
+  preparedNodeInfo =
+    case format of
+      ForHuman   -> nodeInfoToText nodeInfo
+      ForMachine -> nodeInfoToJSON nodeInfo
+
 writeTraceObjectsToFile
   :: NodeId
   -> Text
@@ -52,15 +69,29 @@ writeTraceObjectsToFile
   -> IO ()
 writeTraceObjectsToFile _ _ _ _ [] = return ()
 writeTraceObjectsToFile nodeId nodeName rootDir format traceObjects = do
-  createDirectoryIfMissing True subDirForLogs
+  pathToCurrentLog <- prepareLogsStructure nodeId nodeName rootDir format 
+  unless (null itemsToWrite) $
+    LBS.appendFile pathToCurrentLog . encodeUtf8 . TL.concat $ itemsToWrite
+ where
+  itemsToWrite = mapMaybe formatter traceObjects
+  formatter = case format of
+                ForHuman   -> traceObjectToText
+                ForMachine -> traceObjectToJSON
 
+prepareLogsStructure
+  :: NodeId
+  -> Text
+  -> FilePath
+  -> LogFormat
+  -> IO FilePath
+prepareLogsStructure nodeId nodeName rootDir format = do
+  createDirectoryIfMissing True subDirForLogs
   ifM (doesFileExist pathToCurrentLog)
     (unlessM (doesSymLinkValid pathToCurrentLog) $ do
       removeFile pathToCurrentLog
       createLogAndSymLink subDirForLogs format)
     (createLogAndSymLink subDirForLogs format)
-
-  writeTraceObjects pathToCurrentLog $ formatter format
+  return pathToCurrentLog
  where
   subDirForLogs = rootDir </> nodeFullId
   nodeFullId = if T.null nodeName
@@ -69,22 +100,54 @@ writeTraceObjectsToFile nodeId nodeName rootDir format traceObjects = do
   -- This is a symlink to the current log file, please see rotation parameters.
   pathToCurrentLog = subDirForLogs </> symLinkName format
 
-  formatter ForHuman   = traceObjectToText
-  formatter ForMachine = traceObjectToJSON
-
-  writeTraceObjects logPath formatIt = do
-    let itemsToWrite = mapMaybe formatIt traceObjects
-    unless (null itemsToWrite) $
-      -- It's much more efficiently to encode 'Text' explicitly and
-      -- then perform 'ByteString'-level 'IO' than perform 'Text'-level 'IO'.
-      LBS.appendFile logPath . encodeUtf8 . TL.concat $ itemsToWrite
-
 nl :: TL.Text
 #if defined(mingw32_HOST_OS)
 nl = "\r\n"
 #else
 nl = "\n"
 #endif
+
+nodeInfoToText :: NodeInfo -> TL.Text
+nodeInfoToText NodeInfo{..} = TL.intercalate nl
+  [ "Node info"
+  , "  name: "              <> TL.fromStrict niName
+  , "  protocol: "          <> TL.fromStrict niProtocol
+  , "  version: "           <> TL.fromStrict niVersion
+  , "  commit: "            <> TL.fromStrict niCommit
+  , "  start time: "        <> TL.pack (show niStartTime)
+  , "  system start time: " <> TL.pack (show niSystemStartTime)
+  , nl
+  ]
+
+data NodeInfoForJSON = NodeInfoForJSON
+  { jName            :: !T.Text
+  , jProtocol        :: !T.Text
+  , jVersion         :: !T.Text
+  , jCommit          :: !T.Text
+  , jStartTime       :: !UTCTime
+  , jSystemStartTime :: !UTCTime 
+  }
+
+instance ToJSON NodeInfoForJSON where
+  toJSON NodeInfoForJSON{..} =
+    object [ "nodeName"        .= jName
+           , "protocol"        .= jProtocol
+           , "version"         .= jVersion
+           , "commit"          .= jCommit
+           , "startTime"       .= formatTime defaultTimeLocale "%FT%T%2Q%Z" jStartTime
+           , "systemStartTime" .= formatTime defaultTimeLocale "%FT%T%2Q%Z" jSystemStartTime
+           ]
+
+nodeInfoToJSON :: NodeInfo -> TL.Text
+nodeInfoToJSON NodeInfo{..} = TL.append nl . encodeToLazyText $
+  NodeInfoForJSON
+    { jName            = niName
+    , jProtocol        = niProtocol
+    , jVersion         = niVersion
+    , jCommit          = niCommit
+    , jStartTime       = niStartTime
+    , jSystemStartTime = niSystemStartTime
+    }
 
 traceObjectToText :: TraceObject -> Maybe TL.Text
 traceObjectToText TraceObject{..} =

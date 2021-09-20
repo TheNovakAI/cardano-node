@@ -241,7 +241,7 @@ runTraceObjectsAcceptor config tfConfig acceptedNodeInfo connId = do
   acceptTraceObjects
     tfConfig
     (traceObjectsHandler config nodeId acceptedNodeInfo)
-    (nodeInfoHandler nodeId acceptedNodeInfo)
+    (nodeInfoHandler config nodeId acceptedNodeInfo)
 
 runEKGAcceptorInit
   :: Show addr
@@ -265,7 +265,7 @@ runTraceObjectsAcceptorInit config tfConfig acceptedNodeInfo connId = do
   acceptTraceObjectsInit
     tfConfig
     (traceObjectsHandler config nodeId acceptedNodeInfo)
-    (nodeInfoHandler nodeId acceptedNodeInfo)
+    (nodeInfoHandler config nodeId acceptedNodeInfo)
 
 prepareMetricsStores
   :: Show addr

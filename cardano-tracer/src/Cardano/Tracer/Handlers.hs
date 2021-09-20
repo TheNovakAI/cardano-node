@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -24,20 +22,26 @@ import           Trace.Forward.Protocol.Type (NodeInfo (..))
 import           Cardano.Logging (TraceObject)
 
 import           Cardano.Tracer.Configuration
-import           Cardano.Tracer.Handlers.Logs.File (writeTraceObjectsToFile)
-import           Cardano.Tracer.Handlers.Logs.Journal (writeTraceObjectsToJournal)
+import           Cardano.Tracer.Handlers.Logs.File
+import           Cardano.Tracer.Handlers.Logs.Journal
 import           Cardano.Tracer.Types
 
--- | Node's info is required for many parts of cardano-tracer.
+-- | Node's info is required by many parts of 'cardano-tracer'.
 --   But some of these parts may be inactive (yet) when node's info
---   is accepted, so we have to store it.
+--   is already accepted, so we have to store it.
 nodeInfoHandler
-  :: NodeId
+  :: TracerConfig
+  -> NodeId
   -> AcceptedNodeInfo
   -> NodeInfo
   -> IO ()
-nodeInfoHandler nodeId acceptedNodeInfo ni = atomically $
-  modifyTVar' acceptedNodeInfo $ insert nodeId ni
+nodeInfoHandler TracerConfig{logging} nodeId acceptedNodeInfo ni = do
+  atomically . modifyTVar' acceptedNodeInfo $ insert nodeId ni
+  -- We can already write this node's info in the log and/or journal.
+  forConcurrently_ (nub logging) $ \LoggingParams{logMode, logRoot, logFormat} ->
+    case logMode of
+      FileMode    -> showProblemIfAny $ writeNodeInfoToFile nodeId logRoot logFormat ni
+      JournalMode -> showProblemIfAny $ writeNodeInfoToJournal nodeId ni
 
 traceObjectsHandler
   :: TracerConfig
@@ -57,10 +61,11 @@ traceObjectsHandler TracerConfig{logging} nodeId acceptedNodeInfo traceObjects =
         showProblemIfAny $ writeTraceObjectsToFile nodeId niName logRoot logFormat traceObjects
       JournalMode ->
         showProblemIfAny $ writeTraceObjectsToJournal nodeId niName traceObjects
- where
-  showProblemIfAny action =
-    try action >>= \case
-      Left (e :: IOException) -> logTrace $ "cardano-tracer, cannot write trace objects: " <> show e
-      Right _ -> return ()
 
+showProblemIfAny :: IO () -> IO ()
+showProblemIfAny action =
+  try action >>= \case
+    Left (e :: IOException) -> logTrace $ "cardano-tracer, cannot write trace objects: " <> show e
+    Right _ -> return ()
+ where
   logTrace = traceWith $ showTracing stdoutTracer
